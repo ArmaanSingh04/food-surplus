@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  DONOR
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  password      String
+  role          Role      @default(USER)
+}
+
+enum Food_type{
+  veg
+  nonveg
+}
+
+enum Quantity_type{
+  plates
+  kg
+  items
+}
+
+enum Freshness_status{
+  freshcooked
+  packaged
+  near_expiry
+  unknown
+}
+
+// add who posted foreign key afterwards
+
+model Post {
+  post_id           Int       @id @default(autoincrement())
+  food_name         String    
+  food_type         Food_type    
+  quantity_value    Int
+  quantity_type     Quantity_type
+  expiry_timer      DateTime
+  image             String[]
+  freshness_status  Freshness_status
+}

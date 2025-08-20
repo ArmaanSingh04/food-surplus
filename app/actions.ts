@@ -3,6 +3,7 @@
 import prisma from "@/db";
 import { cloudinary } from "@/lib/cloudinary";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 
 export type FoodType = "veg" | "nonveg";
@@ -102,4 +103,28 @@ export async function createPost(formData: FormData) {
       error: error instanceof Error ? error.message : "Failed to create post" 
     };
   }
+}
+
+// create a action to take email password and account type and put it into the user table
+export async function registerUser(formData: FormData) {
+  const email = String(formData.get("email") || "").trim();
+  const password = String(formData.get("password") || "").trim();
+  const accountType = (String(formData.get("accountType") || "recipient") === "donor")
+    ? "donor"
+    : "recipient";
+
+  if (!email || !password) {
+    throw new Error("Email and password are required");
+  }
+
+  await prisma.user.create({
+    data: {
+      email,
+      password,
+      role: accountType === "recipient" ? "USER" : "DONOR",
+    },
+  });
+
+  revalidatePath("/login");
+  redirect("/login");
 }

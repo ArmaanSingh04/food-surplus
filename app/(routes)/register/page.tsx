@@ -28,7 +28,7 @@ export default function RegisterPage() {
 					<button
 						type="button"
 						onClick={() => handleSelect("recipient")}
-						className={`text-left rounded-xl border p-5 transition shadow-sm focus:outline-none ${
+						className={`cursor-pointer text-left rounded-xl border p-5 transition shadow-sm focus:outline-none ${
 							accountType === "recipient"
 								? "border-emerald-500 ring-2 ring-emerald-200"
 								: "border-amber-200 hover:border-amber-300"
@@ -51,7 +51,7 @@ export default function RegisterPage() {
 					<button
 						type="button"
 						onClick={() => handleSelect("donor")}
-						className={`text-left rounded-xl border p-5 transition shadow-sm focus:outline-none ${
+						className={`cursor-pointer text-left rounded-xl border p-5 transition shadow-sm focus:outline-none ${
 							accountType === "donor"
 								? "border-emerald-500 ring-2 ring-emerald-200"
 								: "border-amber-200 hover:border-amber-300"
@@ -78,7 +78,7 @@ export default function RegisterPage() {
 					</p>
 					<button
 						onClick={handleContinue}
-						className="rounded-lg bg-emerald-600 px-5 py-2.5 text-white font-medium hover:bg-emerald-700"
+						className="cursor-pointer rounded-lg bg-emerald-600 px-5 py-2.5 text-white font-medium hover:bg-emerald-700"
 					>
 						Continue
 					</button>

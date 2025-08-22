@@ -128,3 +128,22 @@ export async function registerUser(formData: FormData) {
   revalidatePath("/login");
   redirect("/login");
 }
+
+// Function to fetch all posts
+export async function getAllPosts() {
+  try {
+    const posts = await prisma.post.findMany({
+      orderBy: {
+        post_id: 'desc'
+      }
+    });
+    
+    return { success: true, posts };
+  } catch (error) {
+    console.error("Error fetching posts:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to fetch posts" 
+    };
+  }
+}

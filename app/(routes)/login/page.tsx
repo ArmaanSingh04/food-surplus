@@ -28,7 +28,7 @@ export default function LoginPage() {
 				return;
 			}
 
-			router.replace("/");
+			router.replace("/dashboard");
 			router.refresh();
 		} catch (err) {
 			setError("Something went wrong. Please try again.");
@@ -84,7 +84,7 @@ export default function LoginPage() {
 					<button
 						type="submit"
 						disabled={isSubmitting}
-						className="mt-2 w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-white font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+						className="cursor-pointer mt-2 w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-white font-medium hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
 					>
 						{isSubmitting ? "Signing in..." : "Sign in"}
 					</button>

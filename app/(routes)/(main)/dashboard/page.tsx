@@ -56,10 +56,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Auth Buttons */}
             <div className="hidden md:block">
               <div className="ml-4 flex items-center space-x-4">
-                {/* Post Surplus Food Button for Donors */}
                 {userRole === "DONOR" && (
                   <Link
                     href="/donor/form"

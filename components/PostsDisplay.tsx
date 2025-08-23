@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { getAllPosts } from "@/app/actions";
+import ClaimFoodModal from "./ClaimFoodModal";
 
 interface Post {
   post_id: number;
@@ -10,9 +11,12 @@ interface Post {
   food_type: "veg" | "nonveg";
   quantity_value: number;
   quantity_type: "plates" | "kg" | "items";
-  expiry_timer: string;
+  expiry_timer: Date;
   image: string[];
   freshness_status: "freshcooked" | "packaged" | "near_expiry" | "unknown";
+  userClaimStatus?: "pending" | "accepted" | null;
+  leftoverQuantity: number;
+  isAvailable: boolean;
 }
 
 export default function PostsDisplay() {
@@ -21,12 +25,14 @@ export default function PostsDisplay() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeImageIndexes, setActiveImageIndexes] = useState<{ [key: number]: number }>({});
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const result = await getAllPosts();
-        if (result.success) {
+        const result = await getAllPosts(session?.user?.id);
+        if (result.success && result.posts) {
           setPosts(result.posts);
         } else {
           setError(result.error || "Failed to fetch posts");
@@ -38,8 +44,10 @@ export default function PostsDisplay() {
       }
     };
 
-    fetchPosts();
-  }, []);
+    if (session?.user?.id) {
+      fetchPosts();
+    }
+  }, [session?.user?.id]);
 
   const handleImageChange = (postId: number, direction: 'next' | 'prev') => {
     setActiveImageIndexes(prev => {
@@ -79,10 +87,9 @@ export default function PostsDisplay() {
       : 'bg-red-100 text-red-800 border-red-200';
   };
 
-  const formatExpiryTime = (expiryTime: string) => {
-    const expiry = new Date(expiryTime);
+  const formatExpiryTime = (expiryTime: Date) => {
     const now = new Date();
-    const diffInHours = Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60));
+    const diffInHours = Math.floor((expiryTime.getTime() - now.getTime()) / (1000 * 60 * 60));
     
     if (diffInHours < 0) {
       return 'Expired';
@@ -94,10 +101,20 @@ export default function PostsDisplay() {
     }
   };
 
-  const handleClaim = async (postId: number) => {
-    // TODO: Implement claim functionality
-    console.log(`Claiming post ${postId}`);
-    alert(`Claim functionality for post ${postId} will be implemented soon!`);
+  const refreshPosts = async () => {
+    try {
+      const result = await getAllPosts(session?.user?.id);
+      if (result.success && result.posts) {
+        setPosts(result.posts);
+      }
+    } catch (err) {
+      console.error("Error refreshing posts:", err);
+    }
+  };
+
+  const handleClaim = async (post: Post) => {
+    setSelectedPost(post);
+    setIsModalOpen(true);
   };
 
   if (loading) {
@@ -133,7 +150,7 @@ export default function PostsDisplay() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {posts.map((post) => (
-          <div key={post.post_id} className="card group">
+          <div key={post.post_id} className={`card group ${!post.isAvailable ? 'opacity-60' : ''}`}>
             {/* Image Slider */}
             <div className="relative mb-4 overflow-hidden rounded-lg">
               {post.image.length > 0 && (
@@ -198,15 +215,35 @@ export default function PostsDisplay() {
                   <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getFreshnessStatusColor(post.freshness_status)}`}>
                     {post.freshness_status.replace('_', ' ')}
                   </span>
+                  {!post.isAvailable && (
+                    <span className="px-2 py-1 text-xs font-medium rounded-full border bg-red-100 text-red-800 border-red-200">
+                      Fully Claimed
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-sm text-gray-600">
-                <span className="font-medium">
-                  {post.quantity_value} {post.quantity_type}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-medium">
+                    {post.leftoverQuantity > 0 ? (
+                      <span className="text-green-600">
+                        {post.leftoverQuantity} {post.quantity_type} available
+                      </span>
+                    ) : (
+                      <span className="text-red-600">
+                        No {post.quantity_type} available
+                      </span>
+                    )}
+                  </span>
+                  {post.leftoverQuantity < post.quantity_value && (
+                    <span className="text-xs text-gray-500">
+                      Originally: {post.quantity_value} {post.quantity_type}
+                    </span>
+                  )}
+                </div>
                 <span className={`font-medium ${
-                  new Date(post.expiry_timer) < new Date() 
+                  post.expiry_timer < new Date() 
                     ? 'text-red-600' 
                     : 'text-green-600'
                 }`}>
@@ -216,17 +253,66 @@ export default function PostsDisplay() {
 
               {/* Claim Button for Recipients */}
               {isRecipient && (
-                <button
-                  onClick={() => handleClaim(post.post_id)}
-                  className="w-full btn-primary text-center py-2 px-4 rounded-lg font-medium transition-all duration-200 hover:shadow-lg transform hover:scale-105 cursor-pointer"
-                >
-                  Claim Food
-                </button>
+                <>
+                  {post.userClaimStatus ? (
+                    <div className="w-full py-2 px-4 rounded-lg font-medium text-center">
+                      {post.userClaimStatus === 'accepted' ? (
+                        <div className="flex items-center justify-center space-x-2 text-green-600 bg-green-50 border border-green-200 rounded-lg py-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>Claim Accepted</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center space-x-2 text-yellow-600 bg-yellow-50 border border-yellow-200 rounded-lg py-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Claim Pending</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : !post.isAvailable ? (
+                    <div className="w-full py-2 px-4 rounded-lg font-medium text-center">
+                      <div className="flex items-center justify-center space-x-2 text-red-600 bg-red-50 border border-red-200 rounded-lg py-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span>Unavailable</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleClaim(post)}
+                      className="w-full btn-primary text-center py-2 px-4 rounded-lg font-medium transition-all duration-200 hover:shadow-lg transform hover:scale-105 cursor-pointer"
+                    >
+                      Claim Food
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
         ))}
       </div>
+
+      {/* Claim Food Modal */}
+      {selectedPost && (
+        <ClaimFoodModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedPost(null);
+            refreshPosts();
+          }}
+          postId={selectedPost.post_id}
+          foodName={selectedPost.food_name}
+          maxQuantity={selectedPost.quantity_value}
+          quantityType={selectedPost.quantity_type}
+          leftoverQuantity={selectedPost.leftoverQuantity}
+          onClaimSuccess={refreshPosts}
+        />
+      )}
     </div>
   );
 }

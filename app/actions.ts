@@ -130,20 +130,199 @@ export async function registerUser(formData: FormData) {
 }
 
 // Function to fetch all posts
-export async function getAllPosts() {
+export async function getAllPosts(userId?: string) {
   try {
     const posts = await prisma.post.findMany({
       orderBy: {
         post_id: 'desc'
       }
     });
+
+    // Calculate leftover quantity for each post by subtracting claimed quantities
+    const postsWithLeftoverQuantity = await Promise.all(
+      posts.map(async (post) => {
+        // Get all claims for this post
+        const claims = await prisma.claim.findMany({
+          where: { post_id: post.post_id },
+          select: { claimed_quantity: true }
+        });
+
+        // Calculate total claimed quantity
+        const totalClaimed = claims.reduce((sum, claim) => sum + claim.claimed_quantity, 0);
+        
+        // Calculate leftover quantity
+        const leftoverQuantity = post.quantity_value - totalClaimed;
+        
+        return {
+          ...post,
+          leftoverQuantity,
+          isAvailable: leftoverQuantity > 0
+        };
+      })
+    );
+
+    // If userId is provided, check which posts the user has claimed
+    let postsWithClaimStatus = postsWithLeftoverQuantity;
+    if (userId) {
+      const userIdNum = parseInt(userId);
+      if (!isNaN(userIdNum)) {
+        const userClaims = await prisma.claim.findMany({
+          where: { user_id: userIdNum },
+          select: { post_id: true, status: true }
+        });
+
+        const claimsMap = new Map(
+          userClaims.map(claim => [claim.post_id, claim.status])
+        );
+
+        postsWithClaimStatus = postsWithLeftoverQuantity.map(post => ({
+          ...post,
+          userClaimStatus: claimsMap.get(post.post_id) || null
+        }));
+      }
+    }
     
-    return { success: true, posts };
+    return { success: true, posts: postsWithClaimStatus };
   } catch (error) {
     console.error("Error fetching posts:", error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to fetch posts" 
+    };
+  }
+}
+
+// Function to claim food
+export async function claimFood(postId: number, userId: string, claimedQuantity: number) {
+  try {
+    // Convert userId from string to number
+    const userIdNum = parseInt(userId);
+    
+    if (isNaN(userIdNum)) {
+      return { 
+        success: false, 
+        error: "Invalid user ID" 
+      };
+    }
+
+    // First check if the post exists and has enough quantity
+    const post = await prisma.post.findUnique({
+      where: { post_id: postId }
+    });
+
+    if (!post) {
+      return { 
+        success: false, 
+        error: "Post not found" 
+      };
+    }
+
+    // Check if user has already claimed this post
+    const existingClaim = await prisma.claim.findFirst({
+      where: {
+        post_id: postId,
+        user_id: userIdNum
+      }
+    });
+
+    if (existingClaim) {
+      return { 
+        success: false, 
+        error: "You have already claimed this food" 
+      };
+    }
+
+    // Calculate leftover quantity for this post
+    const existingClaims = await prisma.claim.findMany({
+      where: { post_id: postId },
+      select: { claimed_quantity: true }
+    });
+
+    const totalClaimed = existingClaims.reduce((sum, claim) => sum + claim.claimed_quantity, 0);
+    const leftoverQuantity = post.quantity_value - totalClaimed;
+
+    // Check if the requested quantity is available
+    if (claimedQuantity > leftoverQuantity) {
+      return { 
+        success: false, 
+        error: `Only ${leftoverQuantity} ${post.quantity_type} available, but you requested ${claimedQuantity}` 
+      };
+    }
+
+    // Determine claim status based on leftover quantity availability
+    const claimStatus = claimedQuantity <= leftoverQuantity ? 'accepted' : 'pending';
+
+    // Create the claim
+    const claim = await prisma.claim.create({
+      data: {
+        post_id: postId,
+        user_id: userIdNum,
+        claimed_quantity: claimedQuantity,
+        status: claimStatus,
+      }
+    });
+
+    // TODO: In the future, you might want to update the post quantity
+    // or mark it as claimed based on business logic
+    
+    return { 
+      success: true, 
+      claim,
+      status: claimStatus,
+      message: claimStatus === 'accepted' 
+        ? `Successfully claimed ${claimedQuantity} ${post.quantity_type} of ${post.food_name}!`
+        : `Claim submitted for ${claimedQuantity} ${post.quantity_type} of ${post.food_name}. Status: Pending`
+    };
+  } catch (error) {
+    console.error("Error claiming food:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to claim food" 
+    };
+  }
+}
+
+// Function to get user claims
+export async function getUserClaims(userId: string) {
+  try {
+    const userIdNum = parseInt(userId);
+    
+    if (isNaN(userIdNum)) {
+      return { 
+        success: false, 
+        error: "Invalid user ID" 
+      };
+    }
+
+    const claims = await prisma.claim.findMany({
+      where: {
+        user_id: userIdNum
+      },
+      include: {
+        post: {
+          select: {
+            post_id: true,
+            food_name: true,
+            food_type: true,
+            quantity_value: true,
+            quantity_type: true,
+            expiry_timer: true,
+            image: true,
+            freshness_status: true
+          }
+        }
+      },
+      orderBy: {
+        claimed_at: 'desc'
+      }
+    });
+    
+    return { success: true, claims };
+  } catch (error) {
+    console.error("Error fetching user claims:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to fetch user claims" 
     };
   }
 }

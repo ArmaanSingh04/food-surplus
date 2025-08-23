@@ -19,6 +19,7 @@ model User {
   email         String    @unique
   password      String
   role          Role      @default(USER)
+  claims            Claim[]
 }
 
 enum Food_type{
@@ -50,4 +51,21 @@ model Post {
   expiry_timer      DateTime
   image             String[]
   freshness_status  Freshness_status
+  claims            Claim[]
+}
+
+enum Status {
+  pending
+  accepted
+}
+model Claim{
+  claim_id          Int       @id @default(autoincrement())
+  post_id           Int
+  user_id           Int
+  claimed_at        DateTime  @default(now())
+  claimed_quantity  Int       @default(1)
+  status            Status    @default(pending)
+
+  post              Post      @relation(fields: [post_id], references: [post_id])
+  user              User      @relation(fields: [user_id], references: [id])
 }

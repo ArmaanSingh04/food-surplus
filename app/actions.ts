@@ -18,6 +18,7 @@ export interface CreatePostData {
   expiry_timer: Date;
   image: File;
   freshness_status: FreshnessStatus;
+  address?: string;
 }
 
 export async function createPost(formData: FormData) {
@@ -30,6 +31,7 @@ export async function createPost(formData: FormData) {
     const expiry_timer = new Date(formData.get("expiry_timer") as string);
     const freshness_status = formData.get("freshness_status") as FreshnessStatus;
     const imageCount = parseInt(formData.get("imageCount") as string) || 0;
+    const address = (formData.get("address") as string) || "Unknown";
 
     if (!food_name || !food_type || !quantity_value || !quantity_type || !expiry_timer || !freshness_status) {
       throw new Error("All fields are required");
@@ -90,6 +92,7 @@ export async function createPost(formData: FormData) {
         expiry_timer,
         image: imageUrls,
         freshness_status,
+        address,
       },
     });
 
@@ -133,6 +136,11 @@ export async function registerUser(formData: FormData) {
 export async function getAllPosts(userId?: string) {
   try {
     const posts = await prisma.post.findMany({
+      where: {
+        expiry_timer: {
+          gt: new Date(),
+        },
+      },
       orderBy: {
         post_id: 'desc'
       }

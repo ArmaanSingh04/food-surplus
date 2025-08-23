@@ -26,7 +26,7 @@ export default function ClaimFoodModal({
   onClaimSuccess
 }: ClaimFoodModalProps) {
   const { data: session } = useSession();
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -35,7 +35,7 @@ export default function ClaimFoodModal({
   // Reset quantity when modal opens
   useEffect(() => {
     if (isOpen) {
-      setQuantity(1);
+      setQuantity("");
       setError(null);
       setIsSuccess(false);
       setClaimResult(null);
@@ -53,8 +53,16 @@ export default function ClaimFoodModal({
     setIsSubmitting(true);
     setError(null);
 
+    // Parse quantity only on submit
+    const qty = parseInt(quantity, 10);
+    if (isNaN(qty) || qty <= 0) {
+      setIsSubmitting(false);
+      setError("Please enter a valid quantity");
+      return;
+    }
+
     try {
-      const result = await claimFood(postId, session.user.id, quantity);
+      const result = await claimFood(postId, session.user.id, qty);
 
       if (result.success) {
         //console.log(`Successfully claimed ${result.claimed_quantity || quantity} ${quantityType} of ${foodName} from post ${postId}`);
@@ -67,7 +75,7 @@ export default function ClaimFoodModal({
           // Close modal after 2 seconds for accepted claims
           setTimeout(() => {
             onClose();
-            setQuantity(1); // Reset quantity
+            setQuantity(""); // Reset quantity
             setIsSuccess(false);
             setClaimResult(null);
             onClaimSuccess?.(); // Refresh posts
@@ -78,7 +86,7 @@ export default function ClaimFoodModal({
           // For pending claims, close modal after 3 seconds to show status
           setTimeout(() => {
             onClose();
-            setQuantity(1); // Reset quantity
+            setQuantity(""); // Reset quantity
             setIsSuccess(false);
             setClaimResult(null);
             onClaimSuccess?.(); // Refresh posts
@@ -97,15 +105,7 @@ export default function ClaimFoodModal({
   };
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '') {
-      setQuantity(1);
-    } else {
-      const numValue = parseInt(value);
-      if (!isNaN(numValue) && numValue >= 1 && numValue <= leftoverQuantity) {
-        setQuantity(numValue);
-      }
-    }
+    setQuantity(e.target.value);
   };
 
   if (!isOpen) return null;
@@ -174,24 +174,19 @@ export default function ClaimFoodModal({
                 Quantity to Claim
               </label>
               <div className="relative">
-                                 <input
-                   type="number"
-                   id="quantity"
-                   min="1"
-                   max={leftoverQuantity}
-                   value={quantity}
-                   onChange={handleQuantityChange}
-                   className="input-field w-full text-center text-lg font-semibold"
-                   placeholder="Enter quantity"
-                   key={`quantity-${postId}`}
-                 />
+                <input
+                  type="number"
+                  id="quantity"
+                  value={quantity}
+                  onChange={handleQuantityChange}
+                  className="input-field w-full text-center text-lg font-semibold"
+                  placeholder="Enter quantity"
+                  key={`quantity-${postId}`}
+                />
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
                   {quantityType}
                 </div>
               </div>
-                             <p className="text-xs text-gray-500 mt-1">
-                 Min: 1, Max: {leftoverQuantity} {quantityType}
-               </p>
             </div>
 
             <div className="flex space-x-3">

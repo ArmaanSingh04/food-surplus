@@ -50,6 +50,7 @@ model Post {
   quantity_type     Quantity_type
   expiry_timer      DateTime
   image             String[]
+  address           String  @default("Unknown")
   freshness_status  Freshness_status
   claims            Claim[]
 }

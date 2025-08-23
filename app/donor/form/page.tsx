@@ -9,10 +9,56 @@ export default function DonorForm() {
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const formRef = useRef<HTMLFormElement>(null);
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Controlled food name to enable programmatic updates from the model
+    const [foodName, setFoodName] = useState<string>("");
+    // Store the latest prediction coming from the model
+    const [predictedName, setPredictedName] = useState<string>("");
+    const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+    const MODEL_URL = 'http://localhost:8000/predict';
+
+    const predictFromImage = async (image: File): Promise<string | null> => {
+        try {
+            const fd = new FormData();
+            // Common FastAPI pattern is field name 'file'
+            fd.append('file', image);
+            const res = await fetch(MODEL_URL, {
+                method: 'POST',
+                body: fd,
+            });
+            if (!res.ok) return null;
+            const data = await res.json();
+            console.log('Prediction API response:', data);
+            // Accept common shapes, prioritize FastAPI format: { predictions: [{ class, confidence }] }
+            const name: string | undefined =
+                data?.predictions?.[0]?.class ??
+                data?.label ??
+                data?.class ??
+                data?.prediction ??
+                data?.name ??
+                data?.food_name;
+            return name ?? null;
+        } catch (err) {
+            console.error('Prediction API error:', err);
+            return null;
+        }
+    };
+
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const filesArray = Array.from(e.target.files);
             setSelectedImages(filesArray);
+            // Instantly upload first image to get a quick name suggestion
+            if (filesArray.length > 0) {
+                setIsGenerating(true);
+                const name = await predictFromImage(filesArray[0]);
+                if (name) {
+                    setPredictedName(name);
+                    // Do not overwrite user's manual entry if present
+                    setFoodName(prev => (prev && prev.trim().length > 0 ? prev : name));
+                }
+                setIsGenerating(false);
+            }
         }
     };
 
@@ -32,6 +78,9 @@ export default function DonorForm() {
         if (fileInput) {
             fileInput.value = '';
         }
+        // Clear controlled and prediction states
+        setFoodName("");
+        setPredictedName("");
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -41,12 +90,12 @@ export default function DonorForm() {
 
         try {
             const formData = new FormData(e.currentTarget);
-            
+
             // Add all selected images to formData
             selectedImages.forEach((image, index) => {
                 formData.append(`image_${index}`, image);
             });
-            
+
             // Add the count of images
             formData.append('imageCount', selectedImages.length.toString());
 
@@ -90,14 +139,39 @@ export default function DonorForm() {
                             <label htmlFor="food_name" className="block text-sm font-medium text-gray-700 mb-2">
                                 Food Name
                             </label>
-                            <input
-                                type="text"
-                                id="food_name"
-                                name="food_name"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                                placeholder="Enter food name"
-                                required
-                            />
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    id="food_name"
+                                    name="food_name"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                                    placeholder="Enter food name"
+                                    required
+                                    value={foodName}
+                                    onChange={(e) => setFoodName(e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (selectedImages.length === 0) return;
+                                        setIsGenerating(true);
+                                        const name = await predictFromImage(selectedImages[0]);
+                                        if (name) {
+                                            setPredictedName(name);
+                                            setFoodName(name);
+                                        }
+                                        setIsGenerating(false);
+                                    }}
+                                    className="shrink-0 px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                                    disabled={selectedImages.length === 0 || isGenerating}
+                                    aria-label="Generate food name from image"
+                                >
+                                    {isGenerating ? 'Generating...' : 'Generate'}
+                                </button>
+                            </div>
+                            {predictedName && (
+                                <p className="text-xs text-gray-500 mt-1">Suggestion: {predictedName}</p>
+                            )}
                         </div>
 
                         <div>
@@ -148,6 +222,20 @@ export default function DonorForm() {
                         </div>
 
                         <div>
+                            <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
+                                Address
+                            </label>
+                            <input
+                                type="text"
+                                id="address"
+                                name="address"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                                placeholder="Enter pickup address"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">This helps recipients know where to pick up.</p>
+                        </div>
+
+                        <div>
                             <label htmlFor="expiry_timer" className="block text-sm font-medium text-gray-700 mb-2">
                                 Expiry Time
                             </label>
@@ -192,6 +280,7 @@ export default function DonorForm() {
                                 required
                             />
                             <p className="text-xs text-gray-500 mt-1">You can select multiple images</p>
+                            <p className="text-xs text-gray-500 mt-1">Images are uploaded to the model instantly to suggest a name.</p>
                         </div>
 
                         {/* Selected Images Preview */}

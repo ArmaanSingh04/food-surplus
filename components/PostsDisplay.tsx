@@ -14,6 +14,7 @@ interface Post {
   expiry_timer: Date;
   image: string[];
   freshness_status: "freshcooked" | "packaged" | "near_expiry" | "unknown";
+  address?: string;
   userClaimStatus?: "pending" | "accepted" | null;
   leftoverQuantity: number;
   isAvailable: boolean;
@@ -222,6 +223,17 @@ export default function PostsDisplay() {
                   )}
                 </div>
               </div>
+
+              {/* Address */}
+              {post.address && (
+                <div className="flex items-center text-sm text-gray-700">
+                  <svg className="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5 9 6.343 9 8s1.343 3 3 3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8c0 7-7.5 13-7.5 13S4.5 15 4.5 8a7.5 7.5 0 1115 0z" />
+                  </svg>
+                  <span className="truncate" title={post.address}>{post.address}</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-sm text-gray-600">
                 <div className="flex flex-col">

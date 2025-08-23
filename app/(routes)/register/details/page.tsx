@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { registerUser } from "@/app/actions";
+import { Suspense } from "react";
+
 
 type AccountType = "recipient" | "donor";
 
@@ -24,6 +26,7 @@ export default function RegisterDetailsPage() {
 	}
 
 	return (
+		<Suspense fallback={<div>Loading...</div>}>
 		<div className="min-h-screen flex items-start sm:items-center justify-center bg-amber-50 px-4 py-10">
 			<div className="w-full max-w-2xl rounded-2xl bg-white shadow-lg border border-amber-100 p-6 sm:p-8">
 				<button
@@ -74,6 +77,7 @@ export default function RegisterDetailsPage() {
 				</form>
 			</div>
 		</div>
+		</Suspense>
 	);
 }
 
